@@ -5,6 +5,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -26,8 +28,21 @@ public class TmdbService {
     }
 
     public List<Filme> buscarPorGenero(int generoId, int pagina) {
-        String url = String.format("%s/discover/movie?api_key=%s&language=pt-BR&sort_by=vote_average.desc&vote_count.gte=300&with_genres=%d&page=%d",
+        String url = String.format("%s/discover/movie?api_key=%s&language=pt-BR&sort_by=popularity.desc&vote_count.gte=150&with_genres=%d&page=%d",
                 apiUrl, apiKey, generoId, pagina);
+        return executarRequisicao(url);
+    }
+
+    public List<Filme> buscarPorEstudio(int companyId, int pagina) {
+        String url = String.format("%s/discover/movie?api_key=%s&language=pt-BR&sort_by=popularity.desc&with_companies=%d&page=%d",
+                apiUrl, apiKey, companyId, pagina);
+        return executarRequisicao(url);
+    }
+
+    public List<Filme> buscarPorTermoGlobal(String query, int pagina) {
+        String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
+        String url = String.format("%s/search/movie?api_key=%s&language=pt-BR&include_adult=false&query=%s&page=%d",
+                apiUrl, apiKey, encoded, pagina);
         return executarRequisicao(url);
     }
 
@@ -39,35 +54,40 @@ public class TmdbService {
     @SuppressWarnings("unchecked")
     private List<Filme> executarRequisicao(String url) {
         List<Filme> filmes = new ArrayList<>();
-        Map response = restClient.get().uri(url).retrieve().body(Map.class);
+        try {
+            Map response = restClient.get().uri(url).retrieve().body(Map.class);
 
-        if (response != null && response.containsKey("results")) {
-            List results = (List) response.get("results");
-            for (Object obj : results) {
-                Map item = (Map) obj;
-                List<Integer> generos = new ArrayList<>();
-                Object genreObj = item.get("genre_ids");
-                if (genreObj instanceof List) {
-                    for (Object g : (List) genreObj) {
-                        if (g instanceof Number) {
-                            generos.add(((Number) g).intValue());
+            if (response != null && response.containsKey("results")) {
+                List results = (List) response.get("results");
+                for (Object obj : results) {
+                    Map item = (Map) obj;
+                    List<Integer> generos = new ArrayList<>();
+                    Object genreObj = item.get("genre_ids");
+                    if (genreObj instanceof List) {
+                        for (Object g : (List) genreObj) {
+                            if (g instanceof Number) {
+                                generos.add(((Number) g).intValue());
+                            }
                         }
                     }
+
+                    Object idObj = item.get("id");
+                    int id = (idObj instanceof Number) ? ((Number) idObj).intValue() : 0;
+
+                    String titulo = item.get("title") != null ? item.get("title").toString() : "";
+                    String sinopse = item.get("overview") != null ? item.get("overview").toString() : "";
+
+                    Object notaObj = item.get("vote_average");
+                    double nota = (notaObj instanceof Number) ? ((Number) notaObj).doubleValue() : 0.0;
+
+                    String posterPath = item.get("poster_path") != null ? item.get("poster_path").toString() : null;
+
+                    if (posterPath != null && !posterPath.isBlank()) {
+                        filmes.add(new Filme(id, titulo, sinopse, nota, posterPath, generos));
+                    }
                 }
-
-                Object idObj = item.get("id");
-                int id = (idObj instanceof Number) ? ((Number) idObj).intValue() : 0;
-
-                String titulo = item.get("title") != null ? item.get("title").toString() : "";
-                String sinopse = item.get("overview") != null ? item.get("overview").toString() : "";
-
-                Object notaObj = item.get("vote_average");
-                double nota = (notaObj instanceof Number) ? ((Number) notaObj).doubleValue() : 0.0;
-
-                String posterPath = item.get("poster_path") != null ? item.get("poster_path").toString() : null;
-
-                filmes.add(new Filme(id, titulo, sinopse, nota, posterPath, generos));
             }
+        } catch (Exception ignored) {
         }
         return filmes;
     }

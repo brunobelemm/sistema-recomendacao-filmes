@@ -5,6 +5,8 @@ import com.brunno.cinematch.service.RecomendacaoService;
 import com.brunno.cinematch.service.TmdbService;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -23,7 +25,13 @@ public class FilmeController {
 
     @GetMapping("/top-avaliados")
     public List<Filme> listarMaisBemAvaliados() {
-        return tmdbService.buscarMaisBemAvaliados(1);
+        Map<Integer, Filme> unicos = new LinkedHashMap<>();
+        for (int pagina = 1; pagina <= 3; pagina++) {
+            for (Filme f : tmdbService.buscarMaisBemAvaliados(pagina)) {
+                unicos.putIfAbsent(f.getId(), f);
+            }
+        }
+        return new ArrayList<>(unicos.values());
     }
 
     @PostMapping("/recomendar")
