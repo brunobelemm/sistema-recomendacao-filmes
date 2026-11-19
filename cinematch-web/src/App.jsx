@@ -8,7 +8,7 @@ export default function App() {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
 
-  const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8080') + '/api/filmes';
+  const API_BASE = (import.meta.env.VITE_API_URL || 'https://sistema-recomendacao-filmes.onrender.com') + '/api/filmes';
 
   useEffect(() => {
     fetch(`${API_BASE}/top-avaliados`) .then((res) => { if (!res.ok) throw new Error('Falha ao conectar com a API Java'); return res.json(); }) .then((data) => setTopAvaliados(data)) .catch(() => setErro('Verifique se o servidor Spring Boot está rodando na porta 8080.')); }, []);  const buscarRecomendacao = async (e) => { e.preventDefault(); if (!descricao.trim()) return;  setCarregando(true); setErro('');  try { const response = await fetch(`${API_BASE}/recomendar`, {
