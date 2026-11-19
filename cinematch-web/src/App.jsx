@@ -46,7 +46,7 @@ export default function App() {
             O que você quer assistir hoje?
           </h2>
           <p className="text-slate-400 mb-6 text-sm md:text-base">
-            Descreva o clima, gênero ou história (ex: <em>"quero um filme de ficção científica no espaço com suspense"</em> ou <em>"comédia leve para rir muito"</em>).
+            Descreva o clima, gênero ou história (ex: <em>"filme de super-heróis da Marvel com muita ação"</em>, <em>"ficção científica no espaço"</em> ou <em>"comédia leve"</em>).
           </p>
 
           <form onSubmit={buscarRecomendacao} className="flex flex-col sm:flex-row gap-3">
@@ -116,7 +116,7 @@ export default function App() {
             rel="noopener noreferrer"
             className="font-semibold text-indigo-400 hover:text-indigo-300 underline underline-offset-4 transition-colors"
           >
-            Brunno Belém
+            Bruno Belem
           </a>
           {' '}•{' '}
           <a
