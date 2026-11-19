@@ -107,6 +107,28 @@ export default function App() {
           </div>
         </section>
       </main>
+          <footer className="mt-16 border-t border-slate-800/80 py-8 text-center text-sm text-slate-400">
+        <p>
+          Desenvolvido por{' '}
+          <a
+            href="https://github.com/brunobelemm"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-indigo-400 hover:text-indigo-300 underline underline-offset-4 transition-colors"
+          >
+            Brunno Belém
+          </a>
+          {' '}•{' '}
+          <a
+            href="https://github.com/brunobelemm"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-slate-300 hover:text-white transition-colors"
+          >
+            github.com/brunobelemm
+          </a>
+        </p>
+      </footer>
     </div>
   );
 }
