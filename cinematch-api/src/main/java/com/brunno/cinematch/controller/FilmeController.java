@@ -24,14 +24,17 @@ public class FilmeController {
     }
 
     @GetMapping("/top-avaliados")
-    public List<Filme> listarMaisBemAvaliados() {
-        Map<Integer, Filme> unicos = new LinkedHashMap<>();
-        for (int pagina = 1; pagina <= 3; pagina++) {
-            for (Filme f : tmdbService.buscarMaisBemAvaliados(pagina)) {
-                unicos.putIfAbsent(f.getId(), f);
+    public List<Filme> listarMaisBemAvaliados(@RequestParam(defaultValue = "1") int pagina) {
+        if (pagina <= 1) {
+            Map<Integer, Filme> unicos = new LinkedHashMap<>();
+            for (int p = 1; p <= 2; p++) {
+                for (Filme f : tmdbService.buscarMaisBemAvaliados(p)) {
+                    unicos.putIfAbsent(f.getId(), f);
+                }
             }
+            return new ArrayList<>(unicos.values());
         }
-        return new ArrayList<>(unicos.values());
+        return tmdbService.buscarMaisBemAvaliados(pagina + 1);
     }
 
     @PostMapping("/recomendar")
@@ -43,5 +46,10 @@ public class FilmeController {
     @GetMapping("/{id}/onde-assistir")
     public Map<String, Object> ondeAssistir(@PathVariable int id) {
         return tmdbService.buscarOndeAssistir(id);
+    }
+
+    @GetMapping("/{id}/detalhes")
+    public Map<String, Object> detalhes(@PathVariable int id) {
+        return tmdbService.buscarDetalhesCompletos(id);
     }
 }
