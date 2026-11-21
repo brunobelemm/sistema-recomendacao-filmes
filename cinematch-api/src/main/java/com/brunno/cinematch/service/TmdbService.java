@@ -64,12 +64,15 @@ public class TmdbService {
         return resultado;
     }
 
-    @SuppressWarnings("unchecked")
+        @SuppressWarnings("unchecked")
     public String buscarTrailerYoutube(int movieId) {
-        String[] idiomas = {"pt-BR", "en-US"};
-        for (String lang : idiomas) {
+        String[] urls = {
+            String.format("%s/movie/%d/videos?api_key=%s&language=pt-BR", apiUrl, movieId, apiKey),
+            String.format("%s/movie/%d/videos?api_key=%s&language=en-US", apiUrl, movieId, apiKey),
+            String.format("%s/movie/%d/videos?api_key=%s", apiUrl, movieId, apiKey)
+        };
+        for (String url : urls) {
             try {
-                String url = String.format("%s/movie/%d/videos?api_key=%s&language=%s", apiUrl, movieId, apiKey, lang);
                 Map response = restClient.get().uri(url).retrieve().body(Map.class);
                 if (response != null && response.containsKey("results")) {
                     List results = (List) response.get("results");
@@ -81,7 +84,7 @@ public class TmdbService {
                         String type = item.get("type") != null ? item.get("type").toString() : "";
                         String key = item.get("key") != null ? item.get("key").toString() : "";
                         if ("YouTube".equalsIgnoreCase(site) && !key.isBlank()) {
-                            if ("Trailer".equalsIgnoreCase(type)) {
+                            if ("Trailer".equalsIgnoreCase(type) || "Teaser".equalsIgnoreCase(type)) {
                                 return key;
                             }
                             if (fallbackKey.isBlank()) {

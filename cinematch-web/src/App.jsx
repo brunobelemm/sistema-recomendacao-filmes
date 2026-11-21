@@ -675,15 +675,34 @@ export default function App() {
             className="bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            {detalhesFilme?.trailerKey && (
+                        {carregandoDetalhes ? (
+              <div className="aspect-video w-full bg-slate-950 border-b border-slate-800 flex flex-col items-center justify-center gap-2 text-slate-400">
+                <span className="inline-block w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs">Carregando trailer oficial...</span>
+              </div>
+            ) : detalhesFilme?.trailerKey ? (
               <div className="aspect-video w-full bg-black border-b border-slate-800">
                 <iframe
                   className="w-full h-full"
-                  src={`https://www.youtube.com/embed/${detalhesFilme.trailerKey}?rel=0`}
+                  src={`https://www.youtube-nocookie.com/embed/${detalhesFilme.trailerKey}?rel=0`}
                   title={`Trailer de ${filmeSelecionado.titulo}`}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                 />
+              </div>
+            ) : (
+              <div className="bg-slate-950/90 border-b border-slate-800 px-6 py-4 flex flex-wrap items-center justify-between gap-3">
+                <span className="text-xs text-slate-400">
+                  Trailer oficial indisponível para incorporação direta no TMDB.
+                </span>
+                <a
+                  href={`https://www.youtube.com/results?search_query=${encodeURIComponent(filmeSelecionado.titulo + ' trailer oficial dublado')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition"
+                >
+                  ▶ Assistir Trailer no YouTube
+                </a>
               </div>
             )}
 
