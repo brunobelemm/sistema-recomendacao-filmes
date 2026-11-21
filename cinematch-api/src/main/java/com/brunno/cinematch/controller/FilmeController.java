@@ -39,4 +39,9 @@ public class FilmeController {
         String descricao = payload.getOrDefault("descricao", "");
         return recomendacaoService.recomendarPorDescricao(descricao);
     }
+
+    @GetMapping("/{id}/onde-assistir")
+    public Map<String, Object> ondeAssistir(@PathVariable int id) {
+        return tmdbService.buscarOndeAssistir(id);
+    }
 }

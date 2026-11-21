@@ -91,4 +91,56 @@ public class TmdbService {
         }
         return filmes;
     }
+
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> buscarOndeAssistir(int movieId) {
+        String url = String.format("%s/movie/%d/watch/providers?api_key=%s", apiUrl, movieId, apiKey);
+        Map<String, Object> resultado = new java.util.LinkedHashMap<>();
+        List> streaming = new ArrayList<>();
+        List> aluguelCompra = new ArrayList<>();
+        String linkTmdb = "";
+
+        try {
+            Map response = restClient.get().uri(url).retrieve().body(Map.class);
+            if (response != null && response.containsKey("results")) {
+                Map results = (Map) response.get("results");
+                if (results != null && results.containsKey("BR")) {
+                    Map br = (Map) results.get("BR");
+                    if (br.get("link") != null) {
+                        linkTmdb = br.get("link").toString();
+                    }
+
+                    extrairProvedores(br.get("flatrate"), streaming);
+                    extrairProvedores(br.get("free"), streaming);
+                    extrairProvedores(br.get("ads"), streaming);
+                    extrairProvedores(br.get("rent"), aluguelCompra);
+                    extrairProvedores(br.get("buy"), aluguelCompra);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        resultado.put("streaming", streaming);
+        resultado.put("aluguelCompra", aluguelCompra);
+        resultado.put("link", linkTmdb);
+        return resultado;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void extrairProvedores(Object listaObj, List> destino) {
+        if (!(listaObj instanceof List)) return;
+        for (Object itemObj : (List) listaObj) {
+            if (!(itemObj instanceof Map)) continue;
+            Map item = (Map) itemObj;
+            String nome = item.get("provider_name") != null ? item.get("provider_name").toString() : "";
+            String logo = item.get("logo_path") != null ? "https://image.tmdb.org/t/p/w92" + item.get("logo_path").toString() : "";
+            boolean jaExiste = destino.stream().anyMatch(p -> nome.equals(p.get("nome")));
+            if (!nome.isBlank() && !jaExiste) {
+                Map<String, String> prov = new java.util.LinkedHashMap<>();
+                prov.put("nome", nome);
+                prov.put("logo", logo);
+                destino.add(prov);
+            }
+        }
+    }
 }
