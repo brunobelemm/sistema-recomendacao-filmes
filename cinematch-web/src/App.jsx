@@ -607,7 +607,7 @@ export default function App() {
                   </h3>
                   {topAvaliados.length > 0 && (
                     <p className="text-xs text-slate-400 mt-1">
-                      Exibindo <span className="text-indigo-400 font-semibold">{topAvaliados.length}</span> filmes carregados (catálogo expansível até 1.000+ títulos)
+                      Exibindo <span className="text-indigo-400 font-semibold">{topAvaliados.length}</span> filmes carregados
                     </p>
                   )}
                 </div>
@@ -638,11 +638,7 @@ export default function App() {
                     {topAvaliados.map((filme) => renderCardComAcoes(filme))}
                   </div>
 
-                  {topAvaliados.length > 0 && topAvaliados.length < 1000 && (
-                    <div className="pt-8 flex flex-wrap items-center justify-center gap-4">
-                      <button
-                        type="button"
-                        onClick={() => carregarMaisFilmes(2)}
+                  
                         disabled={carregandoMais}
                         className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-7 py-3.5 rounded-xl transition cursor-pointer disabled:opacity-50 shadow-lg"
                       >
