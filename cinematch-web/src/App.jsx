@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import CardFilme from './components/CardFilme';
 
 const CATEGORIAS_RAPIDAS = [
-  { id: 'todos', label: 'Todos', query: '' },
+  { id: 'todos', label: 'Todos (Top 1.000)', query: '' },
   { id: 'marvel', label: 'Marvel / Heróis', query: 'filme de super-herois da Marvel' },
   { id: 'acao', label: 'Ação', query: 'acao aventura intensa' },
   { id: 'ficcao', label: 'Ficção Científica', query: 'ficcao cientifica espaco futuro' },
@@ -13,10 +13,21 @@ const CATEGORIAS_RAPIDAS = [
   { id: 'romance', label: 'Romance', query: 'romance amor' },
 ];
 
+const PLATAFORMAS_STREAMING = [
+  { id: 8, nome: 'Netflix' },
+  { id: 119, nome: 'Prime Video' },
+  { id: 337, nome: 'Disney+' },
+  { id: 1899, nome: 'Max' },
+  { id: 307, nome: 'Globoplay' },
+  { id: 350, nome: 'Apple TV+' },
+  { id: 531, nome: 'Paramount+' },
+];
+
 export default function App() {
   const [descricao, setDescricao] = useState('');
   const [categoriaAtiva, setCategoriaAtiva] = useState('todos');
-  const [abaAtiva, setAbaAtiva] = useState('explorar'); // 'explorar' | 'favoritos'
+  const [streamingAtivo, setStreamingAtivo] = useState(null);
+  const [abaAtiva, setAbaAtiva] = useState('explorar'); // 'explorar' | 'favoritos' | 'avaliados'
 
   const [recomendados, setRecomendados] = useState([]);
   const [topAvaliados, setTopAvaliados] = useState([]);
@@ -37,9 +48,23 @@ export default function App() {
     }
   });
 
+  // Avaliações do usuário: { [filmeId]: { filme, estrelas, comentario, data } }
+  const [avaliacoes, setAvaliacoes] = useState(() => {
+    try {
+      const salvo = localStorage.getItem('cinematch_avaliacoes');
+      return salvo ? JSON.parse(salvo) : {};
+    } catch {
+      return {};
+    }
+  });
+
   const [filmeSelecionado, setFilmeSelecionado] = useState(null);
   const [detalhesFilme, setDetalhesFilme] = useState(null);
   const [carregandoDetalhes, setCarregandoDetalhes] = useState(false);
+
+  const [estrelasTemp, setEstrelasTemp] = useState(0);
+  const [comentarioTemp, setComentarioTemp] = useState('');
+  const [feedbackAvaliacao, setFeedbackAvaliacao] = useState('');
 
   const API_BASE = (import.meta.env.VITE_API_URL || 'https://sistema-recomendacao-filmes.onrender.com') + '/api/filmes';
 
@@ -47,9 +72,17 @@ export default function App() {
     try {
       localStorage.setItem('cinematch_minha_lista', JSON.stringify(minhaLista));
     } catch {
-      // ignora erro de quota
+      // ignora
     }
   }, [minhaLista]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('cinematch_avaliacoes', JSON.stringify(avaliacoes));
+    } catch {
+      // ignora
+    }
+  }, [avaliacoes]);
 
   useEffect(() => {
     let ativo = true;
@@ -59,12 +92,13 @@ export default function App() {
 
     const carregarVitrine = async (tentativa = 1) => {
       try {
-        const res = await fetch(`${API_BASE}/top-avaliados?pagina=1`);
+        const res = await fetch(`${API_BASE}/top-avaliados?pagina=1&blocos=2`);
         if (!res.ok) throw new Error('Falha na API');
         const data = await res.json();
         if (!ativo) return;
         clearTimeout(timerAviso);
         setTopAvaliados(data);
+        setPaginaAtual(1);
         setCarregandoInicial(false);
         setServidorAcordando(false);
         setErro('');
@@ -119,11 +153,13 @@ export default function App() {
   const handleFormSubmit = (e) => {
     e.preventDefault();
     setCategoriaAtiva('todos');
+    setStreamingAtivo(null);
     executarBusca(descricao);
   };
 
   const selecionarCategoria = (cat) => {
     setCategoriaAtiva(cat.id);
+    setStreamingAtivo(null);
     setAbaAtiva('explorar');
     if (cat.id === 'todos') {
       setDescricao('');
@@ -134,13 +170,40 @@ export default function App() {
     }
   };
 
-  const carregarMaisFilmes = async () => {
-    if (carregandoMais) return;
-    setCarregandoMais(true);
-    const proximaPagina = paginaAtual + 1;
+  const filtrarPorStreaming = async (plataforma) => {
+    setAbaAtiva('explorar');
+    setCategoriaAtiva('todos');
+    if (streamingAtivo?.id === plataforma.id) {
+      setStreamingAtivo(null);
+      setRecomendados([]);
+      return;
+    }
+
+    setStreamingAtivo(plataforma);
+    setCarregandoBusca(true);
+    setErro('');
 
     try {
-      const res = await fetch(`${API_BASE}/top-avaliados?pagina=${proximaPagina}`);
+      const res = await fetch(`${API_BASE}/streaming/${plataforma.id}?pagina=1`);
+      if (!res.ok) throw new Error('Falha ao filtrar streaming');
+      const data = await res.json();
+      setRecomendados(data);
+    } catch {
+      setErro('Não foi possível carregar o catálogo desta plataforma agora.');
+    } finally {
+      setCarregandoBusca(false);
+    }
+  };
+
+  const carregarMaisFilmes = async (qtdBlocos = 2) => {
+    if (carregandoMais) return;
+    setCarregandoMais(true);
+
+    const blocosBase = 2;
+    const proximaPagina = Math.floor(topAvaliados.length / 40) + 1;
+
+    try {
+      const res = await fetch(`${API_BASE}/top-avaliados?pagina=${proximaPagina}&blocos=${qtdBlocos}`);
       if (res.ok) {
         const novos = await res.json();
         setTopAvaliados((prev) => {
@@ -148,8 +211,12 @@ export default function App() {
           const filtrados = novos.filter((f) => !idsExistentes.has(f.id));
           return [...prev, ...filtrados];
         });
-        setPaginaAtual(proximaPagina);
+        setPaginaAtual((prev) => prev + Math.max(1, qtdBlocos / blocosBase));
+      } else {
+        setErro('Não foi possível carregar mais filmes agora. Tente novamente.');
       }
+    } catch {
+      setErro('Erro de rede ao carregar mais filmes.');
     } finally {
       setCarregandoMais(false);
     }
@@ -171,6 +238,11 @@ export default function App() {
     setFilmeSelecionado(filme);
     setDetalhesFilme(null);
     setCarregandoDetalhes(true);
+    setFeedbackAvaliacao('');
+
+    const avaliacaoExistente = avaliacoes[filme.id];
+    setEstrelasTemp(avaliacaoExistente ? avaliacaoExistente.estrelas : 0);
+    setComentarioTemp(avaliacaoExistente ? avaliacaoExistente.comentario : '');
 
     try {
       const res = await fetch(`${API_BASE}/${filme.id}/detalhes`);
@@ -189,14 +261,46 @@ export default function App() {
     }
   };
 
+  const salvarAvaliacaoUsuario = (e) => {
+    e.preventDefault();
+    if (!filmeSelecionado || estrelasTemp < 1) return;
+
+    setAvaliacoes((prev) => ({
+      ...prev,
+      [filmeSelecionado.id]: {
+        filme: filmeSelecionado,
+        estrelas: estrelasTemp,
+        comentario: comentarioTemp.trim(),
+        data: new Date().toLocaleDateString('pt-BR'),
+      },
+    }));
+
+    setFeedbackAvaliacao('Avaliação salva com sucesso!');
+    setTimeout(() => setFeedbackAvaliacao(''), 3000);
+  };
+
+  const removerAvaliacaoUsuario = (filmeId) => {
+    setAvaliacoes((prev) => {
+      const copia = { ...prev };
+      delete copia[filmeId];
+      return copia;
+    });
+    setEstrelasTemp(0);
+    setComentarioTemp('');
+  };
+
+  const listaAvaliados = Object.values(avaliacoes);
+
   const renderCardComAcoes = (filme, mostrarScore = false) => {
     const salvo = estaNaMinhaLista(filme.id);
+    const minhaNota = avaliacoes[filme.id]?.estrelas;
+
     return (
       <div
         key={filme.id}
         onClick={() => abrirDetalhesFilme(filme)}
-        className="relative group cursor-pointer transition-transform hover:-translate-y-1"
-        title="Clique para ver trailer, sinopse e onde assistir"
+        className="relative group cursor-pointer transition-transform hover:-translate-y-1 flex flex-col"
+        title="Clique para assistir ao trailer, avaliar e ver onde assistir"
       >
         <button
           type="button"
@@ -209,7 +313,19 @@ export default function App() {
         >
           {salvo ? '✓ Na Lista' : '+ Minha Lista'}
         </button>
+
+        {minhaNota && (
+          <span className="absolute top-12 left-3 z-10 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600/90 text-white border border-emerald-400 shadow">
+            Sua nota: ★ {minhaNota}/5
+          </span>
+        )}
+
         <CardFilme filme={filme} mostrarScore={mostrarScore} />
+
+        <div className="mt-2 flex items-center justify-between px-1 text-xs text-slate-400 group-hover:text-indigo-300 transition-colors">
+          <span>▶ Ver trailer e onde assistir</span>
+          <span className="font-medium">★ Avaliar</span>
+        </div>
       </div>
     );
   };
@@ -229,11 +345,11 @@ export default function App() {
             Cine<span className="text-white">Match</span>
           </button>
 
-          <nav className="flex items-center gap-2">
+          <nav className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setAbaAtiva('explorar')}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition cursor-pointer ${
+              className={`px-3.5 py-2 rounded-xl text-sm font-medium transition cursor-pointer ${
                 abaAtiva === 'explorar'
                   ? 'bg-indigo-600 text-white'
                   : 'bg-slate-800/70 text-slate-300 hover:text-white'
@@ -244,7 +360,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setAbaAtiva('favoritos')}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 cursor-pointer ${
+              className={`px-3.5 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 cursor-pointer ${
                 abaAtiva === 'favoritos'
                   ? 'bg-indigo-600 text-white'
                   : 'bg-slate-800/70 text-slate-300 hover:text-white'
@@ -253,6 +369,20 @@ export default function App() {
               <span>Minha Lista</span>
               <span className="bg-slate-950/70 text-indigo-300 text-xs font-bold px-2 py-0.5 rounded-full">
                 {minhaLista.length}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAbaAtiva('avaliados')}
+              className={`px-3.5 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2 cursor-pointer ${
+                abaAtiva === 'avaliados'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-slate-800/70 text-slate-300 hover:text-white'
+              }`}
+            >
+              <span>Minhas Avaliações</span>
+              <span className="bg-slate-950/70 text-emerald-300 text-xs font-bold px-2 py-0.5 rounded-full">
+                {listaAvaliados.length}
               </span>
             </button>
           </nav>
@@ -291,6 +421,67 @@ export default function App() {
               </div>
             )}
           </section>
+        ) : abaAtiva === 'avaliados' ? (
+          <section className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-white">Minhas Avaliações</h2>
+                <p className="text-sm text-slate-400 mt-1">
+                  Filmes que você já assistiu e avaliou no CineMatch.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAbaAtiva('explorar')}
+                className="text-sm text-indigo-400 hover:text-indigo-300 underline cursor-pointer"
+              >
+                ← Voltar para explorar
+              </button>
+            </div>
+
+            {listaAvaliados.length === 0 ? (
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center space-y-3">
+                <p className="text-slate-300 font-medium">Você ainda não avaliou nenhum filme.</p>
+                <p className="text-sm text-slate-400">
+                  Clique em qualquer filme e escolha de 1 a 5 estrelas para registrar sua opinião.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {listaAvaliados.map(({ filme, estrelas, comentario, data }) => (
+                  <div
+                    key={filme.id}
+                    onClick={() => abrirDetalhesFilme(filme)}
+                    className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-4 flex gap-4 cursor-pointer transition"
+                  >
+                    {filme.posterUrl && (
+                      <img
+                        src={filme.posterUrl}
+                        alt={filme.titulo}
+                        className="w-24 h-36 object-cover rounded-xl shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-bold text-lg text-white">{filme.titulo}</h3>
+                        <span className="text-xs text-slate-500">{data}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-amber-400 text-base">
+                        {'★'.repeat(estrelas)}
+                        <span className="text-slate-600">{'★'.repeat(5 - estrelas)}</span>
+                        <span className="text-xs text-slate-300 ml-2">({estrelas}/5)</span>
+                      </div>
+                      {comentario ? (
+                        <p className="text-sm text-slate-300 italic">"{comentario}"</p>
+                      ) : (
+                        <p className="text-xs text-slate-500">Sem comentário escrito.</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         ) : (
           <>
             <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6 md:p-10 shadow-xl space-y-6">
@@ -299,7 +490,7 @@ export default function App() {
                   O que você quer assistir hoje?
                 </h2>
                 <p className="text-slate-400 text-sm md:text-base">
-                  Descreva o clima, gênero ou história (ex: <em>"filme de super-heróis da Marvel com muita ação"</em>, <em>"ficção científica no espaço"</em> ou <em>"comédia leve"</em>).
+                  Pesquise entre milhares de filmes do mundo inteiro (ex: <em>"filme de super-heróis da Marvel com muita ação"</em>, <em>"ficção científica no espaço"</em> ou <em>"comédia leve"</em>).
                 </p>
               </div>
 
@@ -320,21 +511,46 @@ export default function App() {
                 </button>
               </form>
 
-              <div className="flex flex-wrap gap-2 pt-1">
-                {CATEGORIAS_RAPIDAS.map((cat) => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => selecionarCategoria(cat)}
-                    className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition cursor-pointer ${
-                      categoriaAtiva === cat.id
-                        ? 'bg-indigo-600 border-indigo-500 text-white shadow'
-                        : 'bg-slate-950/70 border-slate-800 text-slate-300 hover:border-slate-600 hover:text-white'
-                    }`}
-                  >
-                    {cat.label}
-                  </button>
-                ))}
+              <div className="space-y-3 pt-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 mr-1">
+                    Gêneros:
+                  </span>
+                  {CATEGORIAS_RAPIDAS.map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => selecionarCategoria(cat)}
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition cursor-pointer ${
+                        categoriaAtiva === cat.id && !streamingAtivo
+                          ? 'bg-indigo-600 border-indigo-500 text-white shadow'
+                          : 'bg-slate-950/70 border-slate-800 text-slate-300 hover:border-slate-600 hover:text-white'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 mr-1">
+                    Onde Assistir:
+                  </span>
+                  {PLATAFORMAS_STREAMING.map((plat) => (
+                    <button
+                      key={plat.id}
+                      type="button"
+                      onClick={() => filtrarPorStreaming(plat)}
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition cursor-pointer ${
+                        streamingAtivo?.id === plat.id
+                          ? 'bg-emerald-600 border-emerald-500 text-white shadow'
+                          : 'bg-slate-950/70 border-slate-800 text-slate-300 hover:border-emerald-500/60 hover:text-white'
+                      }`}
+                    >
+                      {plat.nome}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {servidorAcordando && (
@@ -357,34 +573,44 @@ export default function App() {
               <section className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-bold text-indigo-400">
-                    Recomendados para o seu pedido ({recomendados.length})
+                    {streamingAtivo
+                      ? `Disponíveis no catálogo: ${streamingAtivo.nome} (${recomendados.length})`
+                      : `Recomendados para o seu pedido (${recomendados.length})`}
                   </h3>
                   <button
                     type="button"
                     onClick={() => {
                       setRecomendados([]);
                       setCategoriaAtiva('todos');
+                      setStreamingAtivo(null);
                       setDescricao('');
                     }}
                     className="text-xs text-slate-400 hover:text-white underline cursor-pointer"
                   >
-                    Limpar busca
+                    Limpar filtro
                   </button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                  {recomendados.map((filme) => renderCardComAcoes(filme, true))}
+                  {recomendados.map((filme) => renderCardComAcoes(filme, !streamingAtivo))}
                 </div>
               </section>
             )}
 
             <section className="space-y-6">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-xl font-bold text-white">
-                  Mais Bem Avaliados pela Crítica e Público
-                </h3>
+                <div>
+                  <h3 className="text-xl font-bold text-white">
+                    Mais Bem Avaliados pela Crítica e Público
+                  </h3>
+                  {topAvaliados.length > 0 && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      Exibindo <span className="text-indigo-400 font-semibold">{topAvaliados.length}</span> filmes carregados (catálogo expansível até 1.000+ títulos)
+                    </p>
+                  )}
+                </div>
                 <span className="text-xs text-slate-400">
-                  Clique em qualquer filme para assistir ao trailer, ler a sinopse e ver onde assistir
+                  Clique no filme para ver trailer, plataformas onde assistir e avaliar
                 </span>
               </div>
 
@@ -410,15 +636,24 @@ export default function App() {
                     {topAvaliados.map((filme) => renderCardComAcoes(filme))}
                   </div>
 
-                  {topAvaliados.length > 0 && (
-                    <div className="pt-6 text-center">
+                  {topAvaliados.length > 0 && topAvaliados.length < 1000 && (
+                    <div className="pt-8 flex flex-wrap items-center justify-center gap-4">
                       <button
                         type="button"
-                        onClick={carregarMaisFilmes}
+                        onClick={() => carregarMaisFilmes(2)}
                         disabled={carregandoMais}
-                        className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-semibold px-8 py-3 rounded-xl transition cursor-pointer disabled:opacity-50"
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-7 py-3.5 rounded-xl transition cursor-pointer disabled:opacity-50 shadow-lg"
                       >
-                        {carregandoMais ? 'Carregando mais filmes...' : 'Carregar mais filmes'}
+                        {carregandoMais ? 'Buscando mais filmes...' : '+ Carregar mais 40 filmes'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => carregarMaisFilmes(5)}
+                        disabled={carregandoMais}
+                        className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-semibold px-6 py-3.5 rounded-xl transition cursor-pointer disabled:opacity-50"
+                      >
+                        {carregandoMais ? 'Carregando lote...' : '+ Carregar +100 filmes de uma vez'}
                       </button>
                     </div>
                   )}
@@ -459,7 +694,7 @@ export default function App() {
                 />
               )}
 
-              <div className="flex-1 space-y-4">
+              <div className="flex-1 space-y-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h3 className="text-2xl font-bold text-white">
@@ -467,7 +702,7 @@ export default function App() {
                     </h3>
                     <div className="flex flex-wrap items-center gap-2 mt-2">
                       <span className="text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 rounded-full">
-                        ★ {Number(filmeSelecionado.nota).toFixed(1)} / 10
+                        ★ Nota TMDB: {Number(filmeSelecionado.nota).toFixed(1)} / 10
                       </span>
                       <button
                         type="button"
@@ -500,6 +735,7 @@ export default function App() {
                   </p>
                 </div>
 
+                {/* PLATAFORMAS ONDE ASSISTIR */}
                 <div className="pt-3 border-t border-slate-800 space-y-3">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-indigo-400">
                     Onde assistir no Brasil
@@ -554,7 +790,7 @@ export default function App() {
                       )}
 
                       {detalhesFilme?.link && (
-                        <div className="pt-2">
+                        <div className="pt-1">
                           <a
                             href={detalhesFilme.link}
                             target="_blank"
@@ -568,6 +804,64 @@ export default function App() {
                     </>
                   )}
                 </div>
+
+                {/* AVALIAÇÃO DO USUÁRIO */}
+                <form onSubmit={salvarAvaliacaoUsuario} className="pt-4 border-t border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
+                      Sua Avaliação deste Filme
+                    </h4>
+                    {avaliacoes[filmeSelecionado.id] && (
+                      <button
+                        type="button"
+                        onClick={() => removerAvaliacaoUsuario(filmeSelecionado.id)}
+                        className="text-xs text-rose-400 hover:text-rose-300 underline cursor-pointer"
+                      >
+                        Remover avaliação
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {[1, 2, 3, 4, 5].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setEstrelasTemp(num)}
+                        className={`text-2xl transition-transform hover:scale-110 cursor-pointer ${
+                          num <= estrelasTemp ? 'text-amber-400' : 'text-slate-600 hover:text-slate-400'
+                        }`}
+                        title={`${num} ${num === 1 ? 'estrela' : 'estrelas'}`}
+                      >
+                        ★
+                      </button>
+                    ))}
+                    <span className="text-xs text-slate-400 ml-2">
+                      {estrelasTemp > 0 ? `${estrelasTemp} de 5 estrelas` : 'Clique nas estrelas para dar sua nota'}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      value={comentarioTemp}
+                      onChange={(e) => setComentarioTemp(e.target.value)}
+                      placeholder="Escreva um comentário curto sobre o filme (opcional)..."
+                      className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                    />
+                    <button
+                      type="submit"
+                      disabled={estrelasTemp < 1}
+                      className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-semibold px-5 py-2 rounded-xl transition cursor-pointer"
+                    >
+                      Salvar Nota
+                    </button>
+                  </div>
+
+                  {feedbackAvaliacao && (
+                    <p className="text-xs text-emerald-400 font-medium">{feedbackAvaliacao}</p>
+                  )}
+                </form>
               </div>
             </div>
           </div>

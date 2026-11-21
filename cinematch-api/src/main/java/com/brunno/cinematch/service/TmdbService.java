@@ -21,12 +21,13 @@ public class TmdbService {
     private final RestClient restClient = RestClient.create();
 
     public List<Filme> buscarMaisBemAvaliados(int pagina) {
-        String url = String.format("%s/movie/top_rated?api_key=%s&language=pt-BR&page=%d", apiUrl, apiKey, pagina);
+        int paginaSegura = Math.max(1, Math.min(pagina, 500));
+        String url = String.format("%s/movie/top_rated?api_key=%s&language=pt-BR&page=%d", apiUrl, apiKey, paginaSegura);
         return executarRequisicao(url);
     }
 
     public List<Filme> buscarPorGenero(int generoId, int pagina) {
-        String url = String.format("%s/discover/movie?api_key=%s&language=pt-BR&sort_by=popularity.desc&vote_count.gte=150&with_genres=%d&page=%d",
+        String url = String.format("%s/discover/movie?api_key=%s&language=pt-BR&sort_by=popularity.desc&vote_count.gte=100&with_genres=%d&page=%d",
                 apiUrl, apiKey, generoId, pagina);
         return executarRequisicao(url);
     }
@@ -34,6 +35,12 @@ public class TmdbService {
     public List<Filme> buscarPorEstudio(int companyId, int pagina) {
         String url = String.format("%s/discover/movie?api_key=%s&language=pt-BR&sort_by=popularity.desc&with_companies=%d&page=%d",
                 apiUrl, apiKey, companyId, pagina);
+        return executarRequisicao(url);
+    }
+
+    public List<Filme> buscarPorStreamingBrasil(int providerId, int pagina) {
+        String url = String.format("%s/discover/movie?api_key=%s&language=pt-BR&watch_region=BR&with_watch_providers=%d&sort_by=popularity.desc&page=%d",
+                apiUrl, apiKey, providerId, pagina);
         return executarRequisicao(url);
     }
 
@@ -136,7 +143,7 @@ public class TmdbService {
             String logo = item.get("logo_path") != null ? "https://image.tmdb.org/t/p/w92" + item.get("logo_path").toString() : "";
             boolean jaExiste = destino.stream().anyMatch(p -> nome.equals(p.get("nome")));
             if (!nome.isBlank() && !jaExiste) {
-                Map<String, String> prov = new LinkedHashMap<>();
+                Map<String, String> prov = new java.util.LinkedHashMap<>();
                 prov.put("nome", nome);
                 prov.put("logo", logo);
                 destino.add(prov);

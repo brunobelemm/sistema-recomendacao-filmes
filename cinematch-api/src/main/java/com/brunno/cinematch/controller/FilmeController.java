@@ -24,17 +24,35 @@ public class FilmeController {
     }
 
     @GetMapping("/top-avaliados")
-    public List<Filme> listarMaisBemAvaliados(@RequestParam(defaultValue = "1") int pagina) {
-        if (pagina <= 1) {
-            Map<Integer, Filme> unicos = new LinkedHashMap<>();
-            for (int p = 1; p <= 2; p++) {
-                for (Filme f : tmdbService.buscarMaisBemAvaliados(p)) {
-                    unicos.putIfAbsent(f.getId(), f);
-                }
+    public List<Filme> listarMaisBemAvaliados(
+            @RequestParam(defaultValue = "1") int pagina,
+            @RequestParam(defaultValue = "2") int blocos
+    ) {
+        int blocosSeguros = Math.max(1, Math.min(blocos, 6));
+        int paginaInicial = ((Math.max(1, pagina) - 1) * blocosSeguros) + 1;
+        Map<Integer, Filme> unicos = new LinkedHashMap<>();
+
+        for (int p = paginaInicial; p < paginaInicial + blocosSeguros; p++) {
+            for (Filme f : tmdbService.buscarMaisBemAvaliados(p)) {
+                unicos.putIfAbsent(f.getId(), f);
             }
-            return new ArrayList<>(unicos.values());
         }
-        return tmdbService.buscarMaisBemAvaliados(pagina + 1);
+        return new ArrayList<>(unicos.values());
+    }
+
+    @GetMapping("/streaming/{providerId}")
+    public List<Filme> listarPorStreaming(
+            @PathVariable int providerId,
+            @RequestParam(defaultValue = "1") int pagina
+    ) {
+        Map<Integer, Filme> unicos = new LinkedHashMap<>();
+        int inicio = ((Math.max(1, pagina) - 1) * 2) + 1;
+        for (int p = inicio; p < inicio + 2; p++) {
+            for (Filme f : tmdbService.buscarPorStreamingBrasil(providerId, p)) {
+                unicos.putIfAbsent(f.getId(), f);
+            }
+        }
+        return new ArrayList<>(unicos.values());
     }
 
     @PostMapping("/recomendar")
