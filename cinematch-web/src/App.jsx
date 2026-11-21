@@ -31,7 +31,7 @@ export default function App() {
 
   const [recomendados, setRecomendados] = useState([]);
   const [topAvaliados, setTopAvaliados] = useState([]);
-  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [proximaPaginaTmdb, setProximaPaginaTmdb] = useState(3);
   const [carregandoMais, setCarregandoMais] = useState(false);
 
   const [carregandoInicial, setCarregandoInicial] = useState(true);
@@ -98,7 +98,7 @@ export default function App() {
         if (!ativo) return;
         clearTimeout(timerAviso);
         setTopAvaliados(data);
-        setPaginaAtual(1);
+        setProximaPaginaTmdb(3);
         setCarregandoInicial(false);
         setServidorAcordando(false);
         setErro('');
@@ -198,25 +198,27 @@ export default function App() {
   const carregarMaisFilmes = async (qtdBlocos = 2) => {
     if (carregandoMais) return;
     setCarregandoMais(true);
-
-    const blocosBase = 2;
-    const proximaPagina = Math.floor(topAvaliados.length / 40) + 1;
+    setErro('');
 
     try {
-      const res = await fetch(`${API_BASE}/top-avaliados?pagina=${proximaPagina}&blocos=${qtdBlocos}`);
+      const res = await fetch(`${API_BASE}/top-avaliados?pagina=${proximaPaginaTmdb}&blocos=${qtdBlocos}`);
       if (res.ok) {
         const novos = await res.json();
-        setTopAvaliados((prev) => {
-          const idsExistentes = new Set(prev.map((f) => f.id));
-          const filtrados = novos.filter((f) => !idsExistentes.has(f.id));
-          return [...prev, ...filtrados];
-        });
-        setPaginaAtual((prev) => prev + Math.max(1, qtdBlocos / blocosBase));
+        if (novos.length === 0) {
+          setErro('Você chegou ao final do catálogo disponível no momento.');
+        } else {
+          setTopAvaliados((prev) => {
+            const idsExistentes = new Set(prev.map((f) => f.id));
+            const filtrados = novos.filter((f) => !idsExistentes.has(f.id));
+            return [...prev, ...filtrados];
+          });
+          setProximaPaginaTmdb((prev) => prev + qtdBlocos);
+        }
       } else {
-        setErro('Não foi possível carregar mais filmes agora. Tente novamente.');
+        setErro('O servidor ainda está atualizando. Aguarde 30 segundos e clique novamente.');
       }
     } catch {
-      setErro('Erro de rede ao carregar mais filmes.');
+      setErro('Erro de conexão ao buscar mais filmes. Tente novamente em instantes.');
     } finally {
       setCarregandoMais(false);
     }

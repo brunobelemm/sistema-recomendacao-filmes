@@ -28,11 +28,11 @@ public class FilmeController {
             @RequestParam(defaultValue = "1") int pagina,
             @RequestParam(defaultValue = "2") int blocos
     ) {
-        int blocosSeguros = Math.max(1, Math.min(blocos, 6));
-        int paginaInicial = ((Math.max(1, pagina) - 1) * blocosSeguros) + 1;
+        int inicio = Math.max(1, Math.min(pagina, 500));
+        int qtdPaginas = Math.max(1, Math.min(blocos, 5));
         Map<Integer, Filme> unicos = new LinkedHashMap<>();
 
-        for (int p = paginaInicial; p < paginaInicial + blocosSeguros; p++) {
+        for (int p = inicio; p < inicio + qtdPaginas && p <= 500; p++) {
             for (Filme f : tmdbService.buscarMaisBemAvaliados(p)) {
                 unicos.putIfAbsent(f.getId(), f);
             }
@@ -46,7 +46,7 @@ public class FilmeController {
             @RequestParam(defaultValue = "1") int pagina
     ) {
         Map<Integer, Filme> unicos = new LinkedHashMap<>();
-        int inicio = ((Math.max(1, pagina) - 1) * 2) + 1;
+        int inicio = Math.max(1, pagina);
         for (int p = inicio; p < inicio + 2; p++) {
             for (Filme f : tmdbService.buscarPorStreamingBrasil(providerId, p)) {
                 unicos.putIfAbsent(f.getId(), f);
