@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import CardFilme from './components/CardFilme';
 
 const CATEGORIAS_RAPIDAS = [
-  { id: 'todos', label: 'Todos (Top 1.000)', query: '' },
+  { id: 'todos', label: 'Todos', query: '' },
   { id: 'marvel', label: 'Marvel / Heróis', query: 'filme de super-herois da Marvel' },
   { id: 'acao', label: 'Ação', query: 'acao aventura intensa' },
   { id: 'ficcao', label: 'Ficção Científica', query: 'ficcao cientifica espaco futuro' },
@@ -13,26 +13,13 @@ const CATEGORIAS_RAPIDAS = [
   { id: 'romance', label: 'Romance', query: 'romance amor' },
 ];
 
-const PLATAFORMAS_STREAMING = [
-  { id: 8, nome: 'Netflix' },
-  { id: 119, nome: 'Prime Video' },
-  { id: 337, nome: 'Disney+' },
-  { id: 1899, nome: 'Max' },
-  { id: 307, nome: 'Globoplay' },
-  { id: 350, nome: 'Apple TV+' },
-  { id: 531, nome: 'Paramount+' },
-];
-
 export default function App() {
   const [descricao, setDescricao] = useState('');
   const [categoriaAtiva, setCategoriaAtiva] = useState('todos');
-  const [streamingAtivo, setStreamingAtivo] = useState(null);
   const [abaAtiva, setAbaAtiva] = useState('explorar'); // 'explorar' | 'favoritos' | 'avaliados'
 
   const [recomendados, setRecomendados] = useState([]);
   const [topAvaliados, setTopAvaliados] = useState([]);
-  const [proximaPaginaTmdb, setProximaPaginaTmdb] = useState(3);
-  const [carregandoMais, setCarregandoMais] = useState(false);
 
   const [carregandoInicial, setCarregandoInicial] = useState(true);
   const [servidorAcordando, setServidorAcordando] = useState(false);
@@ -48,7 +35,6 @@ export default function App() {
     }
   });
 
-  // Avaliações do usuário: { [filmeId]: { filme, estrelas, comentario, data } }
   const [avaliacoes, setAvaliacoes] = useState(() => {
     try {
       const salvo = localStorage.getItem('cinematch_avaliacoes');
@@ -92,13 +78,12 @@ export default function App() {
 
     const carregarVitrine = async (tentativa = 1) => {
       try {
-        const res = await fetch(`${API_BASE}/top-avaliados?pagina=1&blocos=2`);
+        const res = await fetch(`${API_BASE}/top-avaliados`);
         if (!res.ok) throw new Error('Falha na API');
         const data = await res.json();
         if (!ativo) return;
         clearTimeout(timerAviso);
         setTopAvaliados(data);
-        setProximaPaginaTmdb(3);
         setCarregandoInicial(false);
         setServidorAcordando(false);
         setErro('');
@@ -153,13 +138,11 @@ export default function App() {
   const handleFormSubmit = (e) => {
     e.preventDefault();
     setCategoriaAtiva('todos');
-    setStreamingAtivo(null);
     executarBusca(descricao);
   };
 
   const selecionarCategoria = (cat) => {
     setCategoriaAtiva(cat.id);
-    setStreamingAtivo(null);
     setAbaAtiva('explorar');
     if (cat.id === 'todos') {
       setDescricao('');
@@ -167,77 +150,6 @@ export default function App() {
     } else {
       setDescricao(cat.query);
       executarBusca(cat.query);
-    }
-  };
-
-    const filtrarPorStreaming = async (plataforma) => {
-    setAbaAtiva('explorar');
-    setCategoriaAtiva('todos');
-    if (streamingAtivo?.id === plataforma.id) {
-      setStreamingAtivo(null);
-      setRecomendados([]);
-      return;
-    }
-
-    setStreamingAtivo(plataforma);
-    setCarregandoBusca(true);
-    setErro('');
-
-    try {
-      let data = [];
-      const res = await fetch(`${API_BASE}/streaming/${plataforma.id}?pagina=1`);
-      if (res.ok) {
-        data = await res.json();
-      } else {
-        // Fallback automático enquanto o back-end no Render atualiza
-        const resFallback = await fetch(`${API_BASE}/recomendar`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ descricao: `${plataforma.nome} populares` }),
-        });
-        if (resFallback.ok) {
-          data = await resFallback.json();
-        }
-      }
-
-      if (data.length > 0) {
-        setRecomendados(data.map((f) => ({ ...f, plataformaBadge: plataforma.nome })));
-      } else {
-        setErro(`Nenhum título encontrado para ${plataforma.nome} no momento.`);
-      }
-    } catch {
-      setErro('O servidor no Render está atualizando. Aguarde 1 minuto e tente novamente.');
-    } finally {
-      setCarregandoBusca(false);
-    }
-  };
-
-  const carregarMaisFilmes = async (qtdBlocos = 2) => {
-    if (carregandoMais) return;
-    setCarregandoMais(true);
-    setErro('');
-
-    try {
-      const res = await fetch(`${API_BASE}/top-avaliados?pagina=${proximaPaginaTmdb}&blocos=${qtdBlocos}`);
-      if (res.ok) {
-        const novos = await res.json();
-        if (novos.length === 0) {
-          setErro('Você chegou ao final do catálogo disponível no momento.');
-        } else {
-          setTopAvaliados((prev) => {
-            const idsExistentes = new Set(prev.map((f) => f.id));
-            const filtrados = novos.filter((f) => !idsExistentes.has(f.id));
-            return [...prev, ...filtrados];
-          });
-          setProximaPaginaTmdb((prev) => prev + qtdBlocos);
-        }
-      } else {
-        setErro('O servidor ainda está atualizando. Aguarde 30 segundos e clique novamente.');
-      }
-    } catch {
-      setErro('Erro de conexão ao buscar mais filmes. Tente novamente em instantes.');
-    } finally {
-      setCarregandoMais(false);
     }
   };
 
@@ -319,7 +231,7 @@ export default function App() {
         key={filme.id}
         onClick={() => abrirDetalhesFilme(filme)}
         className="relative group cursor-pointer transition-transform hover:-translate-y-1 flex flex-col"
-        title="Clique para assistir ao trailer, avaliar e ver onde assistir"
+        title="Clique para ver sinopse, onde assistir e avaliar"
       >
         <button
           type="button"
@@ -333,12 +245,6 @@ export default function App() {
           {salvo ? '✓ Na Lista' : '+ Minha Lista'}
         </button>
 
-        {filme.plataformaBadge && (
-          <span className="absolute bottom-24 left-3 z-10 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-600/95 text-white border border-emerald-400 shadow-lg">
-            ▶ {filme.plataformaBadge}
-          </span>
-        )}
-
         {minhaNota && (
           <span className="absolute top-12 left-3 z-10 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600/90 text-white border border-emerald-400 shadow">
             Sua nota: ★ {minhaNota}/5
@@ -348,7 +254,7 @@ export default function App() {
         <CardFilme filme={filme} mostrarScore={mostrarScore} />
 
         <div className="mt-2 flex items-center justify-between px-1 text-xs text-slate-400 group-hover:text-indigo-300 transition-colors">
-          <span>▶ Ver trailer e onde assistir</span>
+          <span>▶ Sinopse e onde assistir</span>
           <span className="font-medium">★ Avaliar</span>
         </div>
       </div>
@@ -536,46 +442,24 @@ export default function App() {
                 </button>
               </form>
 
-              <div className="space-y-3 pt-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 mr-1">
-                    Gêneros:
-                  </span>
-                  {CATEGORIAS_RAPIDAS.map((cat) => (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => selecionarCategoria(cat)}
-                      className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition cursor-pointer ${
-                        categoriaAtiva === cat.id && !streamingAtivo
-                          ? 'bg-indigo-600 border-indigo-500 text-white shadow'
-                          : 'bg-slate-950/70 border-slate-800 text-slate-300 hover:border-slate-600 hover:text-white'
-                      }`}
-                    >
-                      {cat.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 mr-1">
-                    Onde Assistir:
-                  </span>
-                  {PLATAFORMAS_STREAMING.map((plat) => (
-                    <button
-                      key={plat.id}
-                      type="button"
-                      onClick={() => filtrarPorStreaming(plat)}
-                      className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition cursor-pointer ${
-                        streamingAtivo?.id === plat.id
-                          ? 'bg-emerald-600 border-emerald-500 text-white shadow'
-                          : 'bg-slate-950/70 border-slate-800 text-slate-300 hover:border-emerald-500/60 hover:text-white'
-                      }`}
-                    >
-                      {plat.nome}
-                    </button>
-                  ))}
-                </div>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 mr-1">
+                  Gêneros:
+                </span>
+                {CATEGORIAS_RAPIDAS.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => selecionarCategoria(cat)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition cursor-pointer ${
+                      categoriaAtiva === cat.id
+                        ? 'bg-indigo-600 border-indigo-500 text-white shadow'
+                        : 'bg-slate-950/70 border-slate-800 text-slate-300 hover:border-slate-600 hover:text-white'
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
               </div>
 
               {servidorAcordando && (
@@ -598,26 +482,23 @@ export default function App() {
               <section className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-bold text-indigo-400">
-                    {streamingAtivo
-                      ? `Disponíveis no catálogo: ${streamingAtivo.nome} (${recomendados.length})`
-                      : `Recomendados para o seu pedido (${recomendados.length})`}
+                    Recomendados para o seu pedido ({recomendados.length})
                   </h3>
                   <button
                     type="button"
                     onClick={() => {
                       setRecomendados([]);
                       setCategoriaAtiva('todos');
-                      setStreamingAtivo(null);
                       setDescricao('');
                     }}
                     className="text-xs text-slate-400 hover:text-white underline cursor-pointer"
                   >
-                    Limpar filtro
+                    Limpar busca
                   </button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                  {recomendados.map((filme) => renderCardComAcoes(filme, !streamingAtivo))}
+                  {recomendados.map((filme) => renderCardComAcoes(filme, true))}
                 </div>
               </section>
             )}
@@ -635,7 +516,7 @@ export default function App() {
                   )}
                 </div>
                 <span className="text-xs text-slate-400">
-                  Clique no filme para ver trailer, plataformas onde assistir e avaliar
+                  Clique no filme para ver sinopse, plataformas onde assistir e avaliar
                 </span>
               </div>
 
@@ -656,29 +537,9 @@ export default function App() {
                   ))}
                 </div>
               ) : (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                    {topAvaliados.map((filme) => renderCardComAcoes(filme))}
-                  </div>
-
-                  
-                        disabled={carregandoMais}
-                        className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-7 py-3.5 rounded-xl transition cursor-pointer disabled:opacity-50 shadow-lg"
-                      >
-                        {carregandoMais ? 'Buscando mais filmes...' : '+ Carregar mais 40 filmes'}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => carregarMaisFilmes(5)}
-                        disabled={carregandoMais}
-                        className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-semibold px-6 py-3.5 rounded-xl transition cursor-pointer disabled:opacity-50"
-                      >
-                        {carregandoMais ? 'Carregando lote...' : '+ Carregar +100 filmes de uma vez'}
-                      </button>
-                    </div>
-                  )}
-                </>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+                  {topAvaliados.map((filme) => renderCardComAcoes(filme))}
+                </div>
               )}
             </section>
           </>
@@ -694,12 +555,7 @@ export default function App() {
             className="bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-                        {carregandoDetalhes ? (
-              <div className="aspect-video w-full bg-slate-950 border-b border-slate-800 flex flex-col items-center justify-center gap-2 text-slate-400">
-                <span className="inline-block w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-                <span className="text-xs">Carregando trailer oficial...</span>
-              </div>
-            ) : detalhesFilme?.trailerKey ? (
+            {detalhesFilme?.trailerKey && (
               <div className="aspect-video w-full bg-black border-b border-slate-800">
                 <iframe
                   className="w-full h-full"
@@ -708,20 +564,6 @@ export default function App() {
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                 />
-              </div>
-            ) : (
-              <div className="bg-slate-950/90 border-b border-slate-800 px-6 py-4 flex flex-wrap items-center justify-between gap-3">
-                <span className="text-xs text-slate-400">
-                  Trailer oficial indisponível para incorporação direta no TMDB.
-                </span>
-                <a
-                  href={`https://www.youtube.com/results?search_query=${encodeURIComponent(filmeSelecionado.titulo + ' trailer oficial dublado')}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition"
-                >
-                  ▶ Assistir Trailer no YouTube
-                </a>
               </div>
             )}
 
@@ -775,14 +617,13 @@ export default function App() {
                   </p>
                 </div>
 
-                {/* PLATAFORMAS ONDE ASSISTIR */}
                 <div className="pt-3 border-t border-slate-800 space-y-3">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-indigo-400">
                     Onde assistir no Brasil
                   </h4>
 
                   {carregandoDetalhes ? (
-                    <p className="text-sm text-slate-400">Carregando trailer e plataformas disponíveis...</p>
+                    <p className="text-sm text-slate-400">Buscando plataformas disponíveis...</p>
                   ) : (
                     <>
                       {detalhesFilme?.streaming?.length > 0 && (
@@ -845,7 +686,6 @@ export default function App() {
                   )}
                 </div>
 
-                {/* AVALIAÇÃO DO USUÁRIO */}
                 <form onSubmit={salvarAvaliacaoUsuario} className="pt-4 border-t border-slate-800 space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
