@@ -39,7 +39,7 @@ public class TmdbService {
     }
 
     public List<Filme> buscarPorStreamingBrasil(int providerId, int pagina) {
-        String url = String.format("%s/discover/movie?api_key=%s&language=pt-BR&watch_region=BR&with_watch_providers=%d&sort_by=popularity.desc&page=%d",
+        String url = String.format("%s/discover/movie?api_key=%s&language=pt-BR&watch_region=BR&with_watch_providers=%d&with_watch_monetization_types=flatrate|free|ads&sort_by=popularity.desc&page=%d",
                 apiUrl, apiKey, providerId, pagina);
         return executarRequisicao(url);
     }

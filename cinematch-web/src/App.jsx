@@ -170,7 +170,7 @@ export default function App() {
     }
   };
 
-  const filtrarPorStreaming = async (plataforma) => {
+    const filtrarPorStreaming = async (plataforma) => {
     setAbaAtiva('explorar');
     setCategoriaAtiva('todos');
     if (streamingAtivo?.id === plataforma.id) {
@@ -184,12 +184,29 @@ export default function App() {
     setErro('');
 
     try {
+      let data = [];
       const res = await fetch(`${API_BASE}/streaming/${plataforma.id}?pagina=1`);
-      if (!res.ok) throw new Error('Falha ao filtrar streaming');
-      const data = await res.json();
-      setRecomendados(data);
+      if (res.ok) {
+        data = await res.json();
+      } else {
+        // Fallback automático enquanto o back-end no Render atualiza
+        const resFallback = await fetch(`${API_BASE}/recomendar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ descricao: `${plataforma.nome} populares` }),
+        });
+        if (resFallback.ok) {
+          data = await resFallback.json();
+        }
+      }
+
+      if (data.length > 0) {
+        setRecomendados(data.map((f) => ({ ...f, plataformaBadge: plataforma.nome })));
+      } else {
+        setErro(`Nenhum título encontrado para ${plataforma.nome} no momento.`);
+      }
     } catch {
-      setErro('Não foi possível carregar o catálogo desta plataforma agora.');
+      setErro('O servidor no Render está atualizando. Aguarde 1 minuto e tente novamente.');
     } finally {
       setCarregandoBusca(false);
     }
@@ -315,6 +332,12 @@ export default function App() {
         >
           {salvo ? '✓ Na Lista' : '+ Minha Lista'}
         </button>
+
+        {filme.plataformaBadge && (
+          <span className="absolute bottom-24 left-3 z-10 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-600/95 text-white border border-emerald-400 shadow-lg">
+            ▶ {filme.plataformaBadge}
+          </span>
+        )}
 
         {minhaNota && (
           <span className="absolute top-12 left-3 z-10 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600/90 text-white border border-emerald-400 shadow">
